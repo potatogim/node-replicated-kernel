@@ -993,6 +993,7 @@ dependencies = [
  "rand 0.8.3",
  "rawtime",
  "rexpect",
+ "rpc",
  "serde",
  "serde_cbor",
  "slabmalloc",
@@ -1406,6 +1407,10 @@ dependencies = [
  "rumpkernel",
  "vibrio",
 ]
+
+[[package]]
+name = "rpc"
+version = "0.1.0"
 
 [[package]]
 name = "rumpkernel"
