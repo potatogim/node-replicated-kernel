@@ -9,7 +9,7 @@ extern crate smoltcp;
 pub mod cluster_api;
 pub mod rpc;
 pub mod rpc_api;
-//pub mod tcp_client;
+pub mod tcp_client;
 
 #[cfg(test)]
 mod tests {
