@@ -87,6 +87,8 @@ baremetal = []
 prealloc = []
 # Don't boot entire system. only initialize bsp core
 bsp-only = []
+# Assume controller is reachable
+remote-exokernel = []
 # exit: test qemu exit functionality (used heavily for CI)
 test-exit = ["integration-test", "bsp-only"]
 # wrgsbase: Test wrgsbase performance

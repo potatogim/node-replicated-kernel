@@ -9,6 +9,7 @@ use alloc::sync::Arc;
 use core::cell::{RefCell, RefMut};
 use core::pin::Pin;
 use core::ptr;
+use smoltcp::wire::IpAddress;
 use spin::Mutex;
 
 use apic::x2apic::X2APICDriver;
@@ -16,6 +17,8 @@ use arrayvec::ArrayVec;
 use cnr::{Replica as MlnrReplica, ReplicaToken as MlnrReplicaToken};
 use log::trace;
 use node_replication::Replica;
+use rpc::tcp_client::TCPClient;
+use rpc::cluster_api::ClusterClientAPI;
 use x86::current::segmentation::{self};
 use x86::current::task::TaskStateSegment;
 use x86::msr::{wrmsr, IA32_KERNEL_GSBASE};
@@ -27,6 +30,7 @@ use crate::kcb::{ArchSpecificKcb, Kcb};
 use crate::nrproc::NrProcess;
 use crate::process::Pid;
 use crate::process::MAX_PROCESSES;
+use crate::arch::network::init_network;
 use crate::stack::{OwnedStack, Stack};
 
 use super::gdt::GdtTable;
@@ -35,7 +39,6 @@ use super::process::{Ring3Executor, Ring3Process};
 use super::vspace::page_table::PageTable;
 use super::KernelArgs;
 use super::MAX_NUMA_NODES;
-use super::network::SmolTCPDevice;
 
 /// Try to retrieve the KCB by reading the gs register.
 ///
@@ -169,10 +172,10 @@ pub struct Arch86Kcb {
     /// This member should probably not be touched from normal code.
     syscall_stack: Option<OwnedStack>,
 
-    /// A handle to an EthernetInterface device
+    /// A handle to an RPC client
     ///
     /// This is (will be) used to send syscall data.
-    pub network_device: Mutex<SmolTCPDevice<'static>>,
+    pub rpc_client: Mutex<Option<TCPClient<'static>>>,
 }
 
 // The `syscall_stack_top` entry must be at offset 0 of KCB (referenced early-on in exec.S)
@@ -204,7 +207,7 @@ impl Arch86Kcb {
             id: 0,
             node_id: 0,
             max_threads: 0,
-            network_device: Mutex::new(SmolTCPDevice::new()),
+            rpc_client: Mutex::new(None),
         }
     }
 
@@ -216,9 +219,14 @@ impl Arch86Kcb {
         self.init_vspace.borrow_mut()
     }
 
-    pub fn init_network(&mut self) {
-        let mut dev = self.network_device.lock();
-        dev.init();
+    pub fn init_rpc(&mut self, server_ip: IpAddress, server_port: u16) {
+        let mut dev = self.rpc_client.lock();
+        if dev.is_none() {
+            let iface = init_network();
+            let mut client = TCPClient::new(server_ip, server_port, iface);
+            client.join_cluster().unwrap();
+            *dev = Some(client);
+        }
     }
 
     pub fn setup_cnr(
