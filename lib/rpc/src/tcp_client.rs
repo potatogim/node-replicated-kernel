@@ -1,15 +1,14 @@
 use abomonation::{encode, decode};
 use alloc::borrow::ToOwned;
-use alloc::collections::BTreeMap;
 use alloc::{vec, vec::{Vec}};
-use core::str::FromStr;
 use log::{debug, warn};
 
-use smoltcp::iface::{NeighborCache, InterfaceBuilder, Routes, Interface};
-use smoltcp::phy::{TunTapInterface, Medium};
+use smoltcp::iface::EthernetInterface;
 use smoltcp::socket::{SocketSet, SocketHandle, TcpSocket, TcpSocketBuffer};
 use smoltcp::time::Instant;
-use smoltcp::wire::{EthernetAddress, Ipv4Address, IpAddress, IpCidr};
+use smoltcp::wire::IpAddress;
+
+use vmxnet3::smoltcp::DevQueuePhy;
 
 use crate::cluster_api::{ClusterError, ClusterClientAPI, NodeId};
 use crate::rpc_api::{RPCError, RPCClientAPI};
@@ -19,46 +18,25 @@ const RX_BUF_LEN: usize = 4096;
 const TX_BUF_LEN: usize = 4096;
 
 pub struct TCPClient<'a> {
-    iface: Interface<'a, TunTapInterface>,
-    ip: IpAddress,
-    port: u16,
+    iface: EthernetInterface<'a, DevQueuePhy>,
     sockets: SocketSet<'a>,
     server_handle: Option<SocketHandle>,
     server_ip: IpAddress,
     server_port: u16,
+    client_port: u16,
     client_id: NodeId,
     req_id: u64,
 }
 
 impl TCPClient<'_> {
-    pub fn new<'a>(tap: &'a str, mac: &'a str, subnet: u8, ip: &'a str, port: u16, server_ip: &'a str, server_port: u16, gateway: &'a str) -> TCPClient<'a> {
-        let mac = EthernetAddress::from_str(mac).expect("invalid mac address format");
-        let ip = IpAddress::from_str(ip).expect("invalid ip");
-        let server_ip = IpAddress::from_str(server_ip).expect("invalid server ip");
-        let gateway = Ipv4Address::from_str(gateway).expect("invalid gateway ip");
-
-        // setup for interface
-        let device = TunTapInterface::new(tap, Medium::Ethernet).unwrap();
-        let neighbor_cache = NeighborCache::new(BTreeMap::new());
-        let ip_addrs = [IpCidr::new(ip, subnet)];
-        let mut routes = Routes::new(BTreeMap::new());
-        routes.add_default_ipv4_route(gateway).unwrap();
-            
-        // create interface
-        let builder = InterfaceBuilder::new(device)
-            .ip_addrs(ip_addrs)
-            .ethernet_addr(mac)
-            .routes(routes)
-            .neighbor_cache(neighbor_cache);
-
+    pub fn new<'a>(server_ip: IpAddress, server_port: u16, iface: EthernetInterface<'a, DevQueuePhy>) -> TCPClient<'a> {
         TCPClient {
-            port: port,
-            ip: ip,
-            iface: builder.finalize(),
+            iface: iface,
             sockets: SocketSet::new(vec![]),
             server_handle: None,
             server_ip: server_ip,
             server_port: server_port,
+            client_port: 10110,
             client_id: 0,
             req_id: 0,
         }
@@ -78,13 +56,13 @@ impl ClusterClientAPI for TCPClient<'_> {
 
         {
             let mut socket = self.sockets.get::<TcpSocket>(self.server_handle.unwrap());
-            socket.connect((self.server_ip, self.server_port), self.port).unwrap();
-            debug!("Attempting to connect to server {}:{} from {}:{}", self.server_ip, self.server_port, self.ip, self.port);
+            socket.connect((self.server_ip, self.server_port), self.client_port).unwrap();
+            debug!("Attempting to connect to server {}:{}", self.server_ip, self.server_port);
         }
 
         // Connect to server
         loop {
-            match self.iface.poll(&mut self.sockets, Instant::now()) {
+            match self.iface.poll(&mut self.sockets, Instant::from_millis(0)) {
                 Ok(_) => {},
                 Err(e) => {
                     warn!("poll error: {}", e);
@@ -161,7 +139,7 @@ impl RPCClientAPI for TCPClient<'_> {
 
         let mut data_sent = false;
         loop {
-            match self.iface.poll(&mut self.sockets, Instant::now()) {
+            match self.iface.poll(&mut self.sockets, Instant::from_millis(0)) {
                 Ok(_) => {},
                 Err(e) => {
                     warn!("poll error: {}", e);
@@ -182,7 +160,7 @@ impl RPCClientAPI for TCPClient<'_> {
     /// receive data from a remote node
     fn msg_recv(&mut self) -> Result<Vec<u8>, RPCError> {
         loop {
-            match self.iface.poll(&mut self.sockets, Instant::now()) {
+            match self.iface.poll(&mut self.sockets, Instant::from_millis(0)) {
                 Ok(_) => {},
                 Err(e) => {
                     warn!("poll error: {}", e);

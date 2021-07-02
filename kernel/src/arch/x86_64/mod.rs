@@ -60,6 +60,7 @@ pub mod gdt;
 pub mod irq;
 pub mod kcb;
 pub mod memory;
+pub mod network;
 pub mod process;
 pub mod syscall;
 pub mod timer;

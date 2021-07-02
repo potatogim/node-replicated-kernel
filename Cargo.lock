@@ -7,7 +7,7 @@ name = "abomonation"
 version = "0.7.3"
 source = "git+https://github.com/hunhoffe/abomonation.git?branch=no_std#f8dd415285452e7250fda7ccc907622d89160b3d"
 dependencies = [
- "smoltcp 0.7.3",
+ "smoltcp",
 ]
 
 [[package]]
@@ -892,12 +892,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c75de51135344a4f8ed3cfe2720dc27736f7711989703a0b43aadf3753c55577"
 
 [[package]]
-name = "managed"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
-
-[[package]]
 name = "matches"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1429,8 +1423,9 @@ dependencies = [
  "abomonation",
  "lazy_static",
  "log",
- "smoltcp 0.8.0",
+ "smoltcp",
  "spin",
+ "vmxnet3",
 ]
 
 [[package]]
@@ -1529,18 +1524,7 @@ dependencies = [
  "bitflags",
  "byteorder",
  "log",
- "managed 0.7.2",
-]
-
-[[package]]
-name = "smoltcp"
-version = "0.8.0"
-source = "git+https://github.com/smoltcp-rs/smoltcp.git?branch=master#1134eb28d8c6886034f6ccad452101dc5e6d679c"
-dependencies = [
- "bitflags 1.2.1",
- "byteorder",
- "log",
- "managed 0.8.0",
+ "managed",
 ]
 
 [[package]]
@@ -1737,7 +1721,7 @@ dependencies = [
  "driverkit",
  "env_logger 0.8.3",
  "log",
- "smoltcp 0.7.3",
+ "smoltcp",
  "static_assertions",
  "x86 0.40.0",
 ]

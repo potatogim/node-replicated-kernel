@@ -47,7 +47,7 @@ addr2line = { version = "0.15", default-features = false, features = ["rustc-dem
 gimli = { version = "0.24", default-features = false, features = ["read", "endian-reader"] }
 arrayvec = { version = "0.7.0", default-features = false }
 memoffset = { version = "0.6", features = ["unstable_const"] }
-smoltcp = { version = "0.7.1", default-features = false, features = [ "alloc", "log", "proto-ipv4", "proto-igmp", "proto-dhcpv4", "socket-raw", "socket-icmp", "socket-udp", "socket-tcp" ], optional = true }
+smoltcp = { version = "0.7.1", default-features = false, features = [ "alloc", "log", "proto-ipv4", "proto-igmp", "proto-dhcpv4", "socket-raw", "socket-icmp", "socket-udp", "socket-tcp" ] }
 fallible_collections = { git = "https://github.com/gz/fallible_collections.git", branch = "allocator_api", features = ["unstable"] }
 
 [[bin]]
@@ -132,4 +132,4 @@ test-replica-advance = ["integration-test"]
 # test-vmxnet-smoke: Test vmxnet NIC driver
 test-vmxnet-smoke = ["integration-test"]
 # test-vmxnet-smoltcp: Test vmxnet NIC driver with a network stack
-test-vmxnet-smoltcp = ["integration-test", "smoltcp"]
+test-vmxnet-smoltcp = ["integration-test"]

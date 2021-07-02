@@ -9,6 +9,7 @@ use alloc::sync::Arc;
 use core::cell::{RefCell, RefMut};
 use core::pin::Pin;
 use core::ptr;
+use spin::Mutex;
 
 use apic::x2apic::X2APICDriver;
 use arrayvec::ArrayVec;
@@ -34,6 +35,7 @@ use super::process::{Ring3Executor, Ring3Process};
 use super::vspace::page_table::PageTable;
 use super::KernelArgs;
 use super::MAX_NUMA_NODES;
+use super::network::SmolTCPDevice;
 
 /// Try to retrieve the KCB by reading the gs register.
 ///
@@ -166,6 +168,11 @@ pub struct Arch86Kcb {
     /// We switch rsp/rbp to this stack in `exec.S`.
     /// This member should probably not be touched from normal code.
     syscall_stack: Option<OwnedStack>,
+
+    /// A handle to an EthernetInterface device
+    ///
+    /// This is (will be) used to send syscall data.
+    pub network_device: Mutex<SmolTCPDevice<'static>>,
 }
 
 // The `syscall_stack_top` entry must be at offset 0 of KCB (referenced early-on in exec.S)
@@ -197,6 +204,7 @@ impl Arch86Kcb {
             id: 0,
             node_id: 0,
             max_threads: 0,
+            network_device: Mutex::new(SmolTCPDevice::new()),
         }
     }
 
@@ -206,6 +214,11 @@ impl Arch86Kcb {
 
     pub fn init_vspace(&self) -> RefMut<PageTable> {
         self.init_vspace.borrow_mut()
+    }
+
+    pub fn init_network(&mut self) {
+        let mut dev = self.network_device.lock();
+        dev.init();
     }
 
     pub fn setup_cnr(

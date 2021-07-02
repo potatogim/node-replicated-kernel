@@ -6,6 +6,8 @@ extern crate alloc;
 extern crate lazy_static;
 extern crate smoltcp;
 
+extern crate vmxnet3;
+
 pub mod cluster_api;
 pub mod rpc;
 pub mod rpc_api;
