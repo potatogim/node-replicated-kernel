@@ -7,3 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+abomonation = { git="https://github.com/hunhoffe/abomonation.git", branch="no_std" }
+lazy_static = "1.4.0"
+log = { version = "0.4.4", default-features = false }
+smoltcp = { git = "https://github.com/smoltcp-rs/smoltcp.git", branch = "master", default-features = false, features = [ "alloc", "log", "medium-ethernet", "proto-ipv4", "socket-tcp" ] }
+spin = "0.5.2"
