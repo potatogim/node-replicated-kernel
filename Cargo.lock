@@ -1424,7 +1424,7 @@ dependencies = [
  "lazy_static",
  "log",
  "smoltcp",
- "spin",
+ "spin 0.5.2",
  "vmxnet3",
 ]
 
