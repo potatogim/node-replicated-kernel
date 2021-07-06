@@ -7,8 +7,8 @@ use x86::io;
 
 pub use driverkit::iomem::DmaObject;
 
-///  TODO: get rid of this:
-pub const KERNEL_BASE: u64 = 0x400000000000;
+pub use kpi::KERNEL_BASE;
+use x86::bits64::paging::{PAddr, VAddr};
 
 static PCI_CONF_ADDR: u16 = 0xcf8;
 static PCI_CONF_DATA: u16 = 0xcfc;
@@ -92,8 +92,8 @@ impl BarAccess {
 
             BarAccess {
                 pci_addr: (bus, dev, fun),
-                bar0: bar0.into(),
-                bar1: bar1.into(),
+                bar0: bar0 as u64 + KERNEL_BASE,
+                bar1: bar1 as u64 + KERNEL_BASE,
             }
         }
     }
