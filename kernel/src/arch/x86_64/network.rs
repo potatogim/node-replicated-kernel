@@ -7,8 +7,8 @@ use crate::memory::vspace::MapAction;
 use crate::memory::PAddr;
 use kpi::KERNEL_BASE;
 
-use smoltcp::iface::{EthernetInterfaceBuilder, EthernetInterface, NeighborCache};
-use smoltcp::wire::{IpAddress, EthernetAddress, IpCidr};
+use smoltcp::iface::{EthernetInterfaceBuilder, EthernetInterface, Routes, NeighborCache};
+use smoltcp::wire::{IpAddress, Ipv4Address, EthernetAddress, IpCidr};
 
 pub fn init_network<'a>() -> EthernetInterface<'a, DevQueuePhy> {
     // TODO(hack): Map potential vmxnet3 bar addresses XD
@@ -38,11 +38,17 @@ pub fn init_network<'a>() -> EthernetInterface<'a, DevQueuePhy> {
     // Create the EthernetInterface wrapping the VMX device
     let device = DevQueuePhy::new(vmx).expect("Can't create PHY");
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
-    let ethernet_addr = EthernetAddress([0x56, 0xb4, 0x44, 0xe9, 0x62, 0xdc]);
-    let ip_addrs = [IpCidr::new(IpAddress::v4(172, 31, 0, 10), 24)];
+    let ethernet_addr = EthernetAddress([0x02, 0x00, 0x00, 0x00, 0x00, 0x02]);
+    let ip_addrs = [IpCidr::new(IpAddress::v4(172, 31, 0, 12), 24)];
+
+
+    let mut routes = Routes::new(BTreeMap::new());
+    routes.add_default_ipv4_route(Ipv4Address::new(172, 31, 0, 2)).unwrap();
+
     let iface = EthernetInterfaceBuilder::new(device)
         .ip_addrs(ip_addrs)
         .ethernet_addr(ethernet_addr)
+        .routes(routes)
         .neighbor_cache(neighbor_cache)
         .finalize();
     iface

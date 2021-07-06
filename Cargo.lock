@@ -1720,6 +1720,7 @@ dependencies = [
  "custom_error",
  "driverkit",
  "env_logger 0.8.3",
+ "kpi",
  "log",
  "smoltcp",
  "static_assertions",
