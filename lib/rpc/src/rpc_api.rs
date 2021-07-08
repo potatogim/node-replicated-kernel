@@ -1,17 +1,8 @@
 use alloc::vec::Vec;
 use core::result::Result;
 
-use crate::rpc::{RPCType, RPCHeader};
+use crate::rpc::{RPCType, RPCHeader, RPCError};
 use crate::cluster_api::{NodeId};
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum RPCError {
-    MalformedResponse,
-    MalformedRequest,
-    NotImplemented,
-    TransportError,
-    Unknown,
-}
 
 /// RPC server operations
 pub trait RPCServerAPI {

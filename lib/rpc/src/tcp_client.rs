@@ -11,7 +11,7 @@ use smoltcp::wire::IpAddress;
 use vmxnet3::smoltcp::DevQueuePhy;
 
 use crate::cluster_api::{ClusterError, ClusterClientAPI, NodeId};
-use crate::rpc_api::{RPCError, RPCClientAPI};
+use crate::rpc_api::RPCClientAPI;
 use crate::rpc::*;
 
 const RX_BUF_LEN: usize = 4096;
@@ -185,11 +185,11 @@ impl RPCClientAPI for TCPClient<'_> {
 }
 
 impl TCPClient<'_> {
-    pub fn fio_write(&mut self, fd: u64, data: Vec<u8>) -> Result<u64, RPCError> {
+    pub fn fio_write(&mut self, fd: u64, data: Vec<u8>) -> Result<(u64, u64), RPCError> {
         self.fio_writeat(fd, 0, data)
     }
 
-    pub fn fio_writeat(&mut self, fd: u64, offset: u64, data: Vec<u8>) -> Result<u64, RPCError> {
+    pub fn fio_writeat(&mut self, fd: u64, offset: u64, data: Vec<u8>) -> Result<(u64, u64), RPCError> {
         let req = RPCWriteReq {
             fd: fd,
             offset: offset,
@@ -199,22 +199,22 @@ impl TCPClient<'_> {
         req_data.extend(data);
 
         let mut res = self.rpc_call(RPCType::WriteAt, req_data).unwrap();
-        if let Some((res, remaining)) = unsafe { decode::<RPCRWRes>(&mut res) } {
+        if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
-                return Err(RPCError::MalformedResponse);
+                return Err(RPCError::ExtraData);
             }
-            debug!("Wrote {:?} bytes", res.num_bytes);
-            return Ok(res.num_bytes);
+            debug!("Write() {:?}", res);
+            return res.ret;
         } else {
             return Err(RPCError::MalformedResponse);
         }
     }
 
-    pub fn fio_read(&mut self, fd: u64, len: u64) -> Result<u64, RPCError> {
+    pub fn fio_read(&mut self, fd: u64, len: u64) -> Result<(u64, u64), RPCError> {
         self.fio_readat(fd, len, 0)
     }
 
-    pub fn fio_readat(&mut self, fd: u64, len: u64, offset: u64) -> Result<u64, RPCError> {
+    pub fn fio_readat(&mut self, fd: u64, len: u64, offset: u64) -> Result<(u64, u64), RPCError> {
         let req = RPCReadReq {
             fd: fd,
             len: len,
@@ -224,45 +224,46 @@ impl TCPClient<'_> {
         unsafe { encode(&req, &mut req_data) }.unwrap();
 
         let mut res = self.rpc_call(RPCType::ReadAt, req_data).unwrap();
-        if let Some((res, remaining)) = unsafe { decode::<RPCRWRes>(&mut res) } {
-            if res.num_bytes != remaining.len() as u64 {
-                warn!("Unexpected amount of data: bytes_read={:?}, data.len={:?}", res.num_bytes, remaining.len());
-                return Err(RPCError::MalformedRequest);
-            }
-            debug!("Read {:?} bytes: {:?}", res.num_bytes, remaining);
-            return Ok(res.num_bytes);
+        if let Some((res, _remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
+            // TODO: add back in check
+            //if res.num_bytes != remaining.len() as u64 {
+            //    warn!("Unexpected amount of data: bytes_read={:?}, data.len={:?}", res.num_bytes, remaining.len());
+            //    return Err(KError::NotSupported);
+            //}
+            debug!("Read() {:?}", res);
+            return res.ret;
         } else {
             return Err(RPCError::MalformedResponse);
         }
     }
 
-    pub fn fio_create(&mut self, pathname: &[u8]) -> Result<u64, RPCError> {
+    pub fn fio_create(&mut self, pathname: &[u8]) -> Result<(u64, u64), RPCError> {
         self.fio_open_create(pathname, RPCType::Create)
     }
 
-    pub fn fio_open(&mut self, pathname: &[u8]) -> Result<u64, RPCError> {
+    pub fn fio_open(&mut self, pathname: &[u8]) -> Result<(u64, u64), RPCError> {
         self.fio_open_create(pathname, RPCType::Open)
     }
 
-    fn fio_open_create(&mut self, pathname: &[u8], rpc_type: RPCType) -> Result<u64, RPCError>{
+    fn fio_open_create(&mut self, pathname: &[u8], rpc_type: RPCType) -> Result<(u64, u64), RPCError> {
         let req = RPCOpenReq {
             pathname: pathname.to_vec(),
         };
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
         let mut res = self.rpc_call(rpc_type, req_data).unwrap();
-        if let Some((res, remaining)) = unsafe { decode::<RPCOpenRes>(&mut res) } {
+        if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
-                return Err(RPCError::MalformedResponse);
+                return Err(RPCError::ExtraData);
             }
-            debug!("Open() fd = {}", res.fd);
-            return Ok(res.fd);
+            debug!("Open() {:?}", res);
+            return res.ret;
         } else {
             return Err(RPCError::MalformedResponse);
         }
     }
 
-    pub fn fio_close(&mut self, fd: u64) -> Result<(), RPCError> {
+    pub fn fio_close(&mut self, fd: u64) -> Result<(u64, u64), RPCError> {
         let req = RPCCloseReq {
             fd: fd,
         };
@@ -270,36 +271,36 @@ impl TCPClient<'_> {
         unsafe { encode(&req, &mut req_data) }.unwrap();
 
         let mut res = self.rpc_call(RPCType::Close, req_data).unwrap();
-        if let Some((res, remaining)) = unsafe { decode::<RPCCloseRes>(&mut res) } {
+        if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
-                return Err(RPCError::MalformedResponse);
+                return Err(RPCError::ExtraData);
             }
             debug!("Close() {:?}", res);
-            return Ok(());
+            return res.ret;
         } else {
             return Err(RPCError::MalformedResponse);
         }
     }
 
-    pub fn fio_delete(&mut self, pathname: &[u8]) -> Result<(), RPCError> {
+    pub fn fio_delete(&mut self, pathname: &[u8]) -> Result<(u64, u64), RPCError> {
         let req = RPCDeleteReq {
             pathname: pathname.to_vec(),
         };
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
         let mut res = self.rpc_call(RPCType::Delete, req_data).unwrap();
-        if let Some((res, remaining)) = unsafe { decode::<RPCDeleteRes>(&mut res) } {
+        if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
-                return Err(RPCError::MalformedResponse);
+                return Err(RPCError::ExtraData);
             }
             debug!("Delete() {:?}", res);
-            return Ok(());
+            return res.ret;
         } else {
             return Err(RPCError::MalformedResponse);
         }
     }
 
-    pub fn fio_rename(&mut self, oldname: &[u8], newname: &[u8]) -> Result<(), RPCError> {
+    pub fn fio_rename(&mut self, oldname: &[u8], newname: &[u8]) -> Result<(u64, u64), RPCError> {
         let req = RPCRenameReq {
             oldname: oldname.to_vec(),
             newname: newname.to_vec(),
@@ -307,12 +308,12 @@ impl TCPClient<'_> {
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
         let mut res = self.rpc_call(RPCType::FileRename, req_data).unwrap();
-        if let Some((res, remaining)) = unsafe { decode::<RPCRenameRes>(&mut res) } {
+        if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
-                return Err(RPCError::MalformedResponse);
+                return Err(RPCError::ExtraData);
             }
-            debug!("Delete() {:?}", res);
-            return Ok(());
+            debug!("Rename() {:?}", res);
+            return res.ret;
         } else {
             return Err(RPCError::MalformedResponse);
         }
