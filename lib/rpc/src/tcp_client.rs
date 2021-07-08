@@ -237,17 +237,19 @@ impl TCPClient<'_> {
         }
     }
 
-    pub fn fio_create(&mut self, pathname: &[u8]) -> Result<(u64, u64), RPCError> {
-        self.fio_open_create(pathname, RPCType::Create)
+    pub fn fio_create(&mut self, pathname: &[u8], flags: u64, modes: u64) -> Result<(u64, u64), RPCError> {
+        self.fio_open_create(pathname, flags, modes, RPCType::Create)
     }
 
-    pub fn fio_open(&mut self, pathname: &[u8]) -> Result<(u64, u64), RPCError> {
-        self.fio_open_create(pathname, RPCType::Open)
+    pub fn fio_open(&mut self, pathname: &[u8], flags: u64, modes: u64) -> Result<(u64, u64), RPCError> {
+        self.fio_open_create(pathname, flags, modes, RPCType::Open)
     }
 
-    fn fio_open_create(&mut self, pathname: &[u8], rpc_type: RPCType) -> Result<(u64, u64), RPCError> {
+    fn fio_open_create(&mut self, pathname: &[u8], flags: u64, modes: u64, rpc_type: RPCType) -> Result<(u64, u64), RPCError> {
         let req = RPCOpenReq {
             pathname: pathname.to_vec(),
+            flags: flags,
+            modes: modes,
         };
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();

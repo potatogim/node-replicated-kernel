@@ -111,6 +111,8 @@ unsafe_abomonate!(RPCHeader: client_id, req_id, msg_type, msg_len);
 #[derive(Debug)]
 pub struct RPCOpenReq {
     pub pathname: Vec<u8>,
+    pub flags: u64,
+    pub modes: u64,
 }
 unsafe_abomonate!(RPCOpenReq: pathname);
 
