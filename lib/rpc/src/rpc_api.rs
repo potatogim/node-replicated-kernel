@@ -1,13 +1,12 @@
 use alloc::vec::Vec;
 use core::result::Result;
 
-use crate::rpc::{RPCType, RPCHeader, RPCError};
-use crate::cluster_api::{NodeId};
+use crate::cluster_api::NodeId;
+use crate::rpc::{RPCError, RPCHeader, RPCType};
 
 /// RPC server operations
 pub trait RPCServerAPI {
-
-    /// register an RPC func with an ID 
+    /// register an RPC func with an ID
     fn rpc_register(&self, rpc_id: RPCType) -> Result<(), RPCError>;
 
     /// receives next RPC call with RPC ID
@@ -22,7 +21,6 @@ pub trait RPCServerAPI {
 
 /// RPC client operations
 pub trait RPCClientAPI {
-
     /// calls a remote RPC function with ID
     fn rpc_call(&mut self, rpc_id: RPCType, data: Vec<u8>) -> Result<Vec<u8>, RPCError>;
 

@@ -17,12 +17,13 @@ use arrayvec::ArrayVec;
 use cnr::{Replica as MlnrReplica, ReplicaToken as MlnrReplicaToken};
 use log::trace;
 use node_replication::Replica;
-use rpc::tcp_client::TCPClient;
 use rpc::cluster_api::ClusterClientAPI;
+use rpc::tcp_client::TCPClient;
 use x86::current::segmentation::{self};
 use x86::current::task::TaskStateSegment;
 use x86::msr::{wrmsr, IA32_KERNEL_GSBASE};
 
+use crate::arch::network::init_network;
 use crate::cnrfs::MlnrKernelNode;
 use crate::error::KError;
 use crate::fs::{FileSystem, MlnrFS};
@@ -30,7 +31,6 @@ use crate::kcb::{ArchSpecificKcb, Kcb};
 use crate::nrproc::NrProcess;
 use crate::process::Pid;
 use crate::process::MAX_PROCESSES;
-use crate::arch::network::init_network;
 use crate::stack::{OwnedStack, Stack};
 
 use super::gdt::GdtTable;

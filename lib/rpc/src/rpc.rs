@@ -33,7 +33,6 @@ pub enum RPCError {
 }
 unsafe_abomonate!(RPCError);
 
-
 #[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(u8)]
 pub enum RPCType {
@@ -64,12 +63,12 @@ pub enum RPCType {
     FileRename = 12,
     /// Create a directory.
     MkDir = 13,
-    
+
     Unknown,
 }
 
 pub fn is_fileio(op: RPCType) -> bool {
-    return op >= RPCType::Create && op <= RPCType::MkDir
+    return op >= RPCType::Create && op <= RPCType::MkDir;
 }
 
 impl From<u8> for RPCType {
@@ -100,14 +99,14 @@ unsafe_abomonate!(RPCType);
 
 #[derive(Debug)]
 pub struct RPCHeader {
-    pub client_id : u64,
-    pub req_id : u64,
-    pub msg_type : RPCType,
-    pub msg_len : u64,
+    pub client_id: u64,
+    pub req_id: u64,
+    pub msg_type: RPCType,
+    pub msg_len: u64,
 }
 unsafe_abomonate!(RPCHeader: client_id, req_id, msg_type, msg_len);
 
-//////// FILEIO Operations 
+//////// FILEIO Operations
 #[derive(Debug)]
 pub struct RPCOpenReq {
     pub pathname: Vec<u8>,

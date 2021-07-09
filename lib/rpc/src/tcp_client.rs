@@ -1,18 +1,18 @@
-use abomonation::{encode, decode};
+use abomonation::{decode, encode};
 use alloc::borrow::ToOwned;
-use alloc::{vec, vec::{Vec}};
+use alloc::{vec, vec::Vec};
 use log::{debug, warn};
 
 use smoltcp::iface::EthernetInterface;
-use smoltcp::socket::{SocketSet, SocketHandle, TcpSocket, TcpSocketBuffer};
+use smoltcp::socket::{SocketHandle, SocketSet, TcpSocket, TcpSocketBuffer};
 use smoltcp::time::Instant;
 use smoltcp::wire::IpAddress;
 
 use vmxnet3::smoltcp::DevQueuePhy;
 
-use crate::cluster_api::{ClusterError, ClusterClientAPI, NodeId};
-use crate::rpc_api::RPCClientAPI;
+use crate::cluster_api::{ClusterClientAPI, ClusterError, NodeId};
 use crate::rpc::*;
+use crate::rpc_api::RPCClientAPI;
 
 const RX_BUF_LEN: usize = 4096;
 const TX_BUF_LEN: usize = 4096;
@@ -29,7 +29,11 @@ pub struct TCPClient<'a> {
 }
 
 impl TCPClient<'_> {
-    pub fn new<'a>(server_ip: IpAddress, server_port: u16, iface: EthernetInterface<'a, DevQueuePhy>) -> TCPClient<'a> {
+    pub fn new<'a>(
+        server_ip: IpAddress,
+        server_port: u16,
+        iface: EthernetInterface<'a, DevQueuePhy>,
+    ) -> TCPClient<'a> {
         TCPClient {
             iface: iface,
             sockets: SocketSet::new(vec![]),
@@ -44,7 +48,6 @@ impl TCPClient<'_> {
 }
 
 impl ClusterClientAPI for TCPClient<'_> {
-
     /// Register with controller, analogous to LITE join_cluster()
     /// TODO: add timeout?? with error returned if timeout occurs?
     fn join_cluster(&mut self) -> Result<NodeId, ClusterError> {
@@ -56,14 +59,19 @@ impl ClusterClientAPI for TCPClient<'_> {
 
         {
             let mut socket = self.sockets.get::<TcpSocket>(self.server_handle.unwrap());
-            socket.connect((self.server_ip, self.server_port), self.client_port).unwrap();
-            debug!("Attempting to connect to server {}:{}", self.server_ip, self.server_port);
+            socket
+                .connect((self.server_ip, self.server_port), self.client_port)
+                .unwrap();
+            debug!(
+                "Attempting to connect to server {}:{}",
+                self.server_ip, self.server_port
+            );
         }
 
         // Connect to server
         loop {
             match self.iface.poll(&mut self.sockets, Instant::from_millis(0)) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     warn!("poll error: {}", e);
                 }
@@ -79,15 +87,12 @@ impl ClusterClientAPI for TCPClient<'_> {
         self.rpc_call(RPCType::Registration, Vec::new()).unwrap();
         Ok(self.client_id)
     }
-
 }
 
 /// RPC client operations
 impl RPCClientAPI for TCPClient<'_> {
-
     /// calls a remote RPC function with ID
     fn rpc_call(&mut self, rpc_id: RPCType, data: Vec<u8>) -> Result<Vec<u8>, RPCError> {
-
         // Create request header
         let req_hdr = RPCHeader {
             client_id: self.client_id,
@@ -95,7 +100,7 @@ impl RPCClientAPI for TCPClient<'_> {
             msg_type: rpc_id,
             msg_len: data.len() as u64,
         };
-        
+
         // Serialize request header then request body
         let mut req_data = Vec::new();
         unsafe { encode(&req_hdr, &mut req_data) }.unwrap();
@@ -106,14 +111,19 @@ impl RPCClientAPI for TCPClient<'_> {
 
         // Send request
         self.msg_send(req_data).unwrap();
-        
+
         // Receive response and parse header
         let mut res = self.msg_recv().unwrap();
         let (res_hdr, res_body) = unsafe { decode::<RPCHeader>(&mut res) }.unwrap();
 
         // Check request & client IDs, and also length of received data
-        if ((res_hdr.client_id != self.client_id) && rpc_id != RPCType::Registration) || res_hdr.req_id != self.req_id {
-            warn!("Mismatched client id ({}, {}) or request id ({}, {})", res_hdr.client_id, self.client_id, res_hdr.req_id, self.req_id);
+        if ((res_hdr.client_id != self.client_id) && rpc_id != RPCType::Registration)
+            || res_hdr.req_id != self.req_id
+        {
+            warn!(
+                "Mismatched client id ({}, {}) or request id ({}, {})",
+                res_hdr.client_id, self.client_id, res_hdr.req_id, self.req_id
+            );
             return Err(RPCError::MalformedResponse);
         } else if res_hdr.msg_len != (res_body.len() as u64) {
             warn!("Did not receive all RPC data!");
@@ -140,7 +150,7 @@ impl RPCClientAPI for TCPClient<'_> {
         let mut data_sent = false;
         loop {
             match self.iface.poll(&mut self.sockets, Instant::from_millis(0)) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     warn!("poll error: {}", e);
                 }
@@ -161,7 +171,7 @@ impl RPCClientAPI for TCPClient<'_> {
     fn msg_recv(&mut self) -> Result<Vec<u8>, RPCError> {
         loop {
             match self.iface.poll(&mut self.sockets, Instant::from_millis(0)) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     warn!("poll error: {}", e);
                 }
@@ -170,11 +180,13 @@ impl RPCClientAPI for TCPClient<'_> {
             let mut socket = self.sockets.get::<TcpSocket>(self.server_handle.unwrap());
             if socket.can_recv() {
                 // TODO: check rx capacity
-                let data = socket.recv(|buffer| {
-                    let recvd_len = buffer.len();
-                    let data = buffer.to_owned();
-                    (recvd_len, data)
-                }).unwrap();
+                let data = socket
+                    .recv(|buffer| {
+                        let recvd_len = buffer.len();
+                        let data = buffer.to_owned();
+                        (recvd_len, data)
+                    })
+                    .unwrap();
                 if data.len() > 0 {
                     debug!("Client recv: {:?}", data);
                     return Ok(data);
@@ -189,7 +201,12 @@ impl TCPClient<'_> {
         self.fio_writeat(fd, 0, data)
     }
 
-    pub fn fio_writeat(&mut self, fd: u64, offset: u64, data: Vec<u8>) -> Result<(u64, u64), RPCError> {
+    pub fn fio_writeat(
+        &mut self,
+        fd: u64,
+        offset: u64,
+        data: Vec<u8>,
+    ) -> Result<(u64, u64), RPCError> {
         let req = RPCWriteReq {
             fd: fd,
             offset: offset,
@@ -237,15 +254,31 @@ impl TCPClient<'_> {
         }
     }
 
-    pub fn fio_create(&mut self, pathname: &[u8], flags: u64, modes: u64) -> Result<(u64, u64), RPCError> {
+    pub fn fio_create(
+        &mut self,
+        pathname: &[u8],
+        flags: u64,
+        modes: u64,
+    ) -> Result<(u64, u64), RPCError> {
         self.fio_open_create(pathname, flags, modes, RPCType::Create)
     }
 
-    pub fn fio_open(&mut self, pathname: &[u8], flags: u64, modes: u64) -> Result<(u64, u64), RPCError> {
+    pub fn fio_open(
+        &mut self,
+        pathname: &[u8],
+        flags: u64,
+        modes: u64,
+    ) -> Result<(u64, u64), RPCError> {
         self.fio_open_create(pathname, flags, modes, RPCType::Open)
     }
 
-    fn fio_open_create(&mut self, pathname: &[u8], flags: u64, modes: u64, rpc_type: RPCType) -> Result<(u64, u64), RPCError> {
+    fn fio_open_create(
+        &mut self,
+        pathname: &[u8],
+        flags: u64,
+        modes: u64,
+        rpc_type: RPCType,
+    ) -> Result<(u64, u64), RPCError> {
         let req = RPCOpenReq {
             pathname: pathname.to_vec(),
             flags: flags,
@@ -266,9 +299,7 @@ impl TCPClient<'_> {
     }
 
     pub fn fio_close(&mut self, fd: u64) -> Result<(u64, u64), RPCError> {
-        let req = RPCCloseReq {
-            fd: fd,
-        };
+        let req = RPCCloseReq { fd: fd };
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
 
