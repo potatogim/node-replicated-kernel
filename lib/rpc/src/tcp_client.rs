@@ -270,13 +270,10 @@ impl TCPClient<'_> {
                 // write data into user supplied buffer
                 // TODO: more efficient way to write data?
                 } else if bytes_read > 0 {
-                    let mut i = 0;
-                    for elem in buff_ptr.iter_mut() {
-                        *elem = data[i];
-                        i += 1;
-                    }
+                    debug!("Read: {:?}", data);
+                    buff_ptr.copy_from_slice(&data);
                 }
-                debug!("Read() {:?}", res);
+                debug!("Read() {:?} {:?}", res, buff_ptr);
             }
 
             return res.ret;

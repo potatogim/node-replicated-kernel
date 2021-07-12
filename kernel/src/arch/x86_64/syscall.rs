@@ -375,6 +375,7 @@ fn handle_fileio(
             let pathname = arg2;
             let flags = arg3;
             let modes = arg4;
+            let _r = user_virt_addr_valid(pid, pathname, 0)?;
 
             #[cfg(feature = "exokernel")]
             {
@@ -393,7 +394,6 @@ fn handle_fileio(
 
             #[cfg(not(feature = "exokernel"))]
             {
-                let _r = user_virt_addr_valid(pid, pathname, 0)?;
                 return cnrfs::MlnrKernelNode::map_fd(pid, pathname, flags, modes);
             }
         }
@@ -401,6 +401,7 @@ fn handle_fileio(
             let fd = arg2;
             let buffer = arg3;
             let len = arg4;
+            let _r = user_virt_addr_valid(pid, buffer, len)?;
 
             #[cfg(feature = "exokernel")]
             {
@@ -408,13 +409,12 @@ fn handle_fileio(
                 let mut client = kcb.arch.rpc_client.lock();
 
                 if op == FileOperation::Read {
-                    let mut kernslice = crate::process::KernSlice::new(buffer, len as usize);
-                    let mut buff_ptr = Arc::get_mut(&mut kernslice.buffer).unwrap();
+                    let mut userslice = super::process::UserSlice::new(buffer, len as usize);
                     return match client.as_mut().unwrap().fio_read(
                         pid as u64,
                         fd,
                         len,
-                        &mut buff_ptr,
+                        &mut userslice,
                     ) {
                         Ok(a) => Ok(a),
                         Err(err) => Err(err.into()),
@@ -436,7 +436,6 @@ fn handle_fileio(
 
             #[cfg(not(feature = "exokernel"))]
             {
-                let _r = user_virt_addr_valid(pid, buffer, len)?;
                 return cnrfs::MlnrKernelNode::file_io(op, pid, fd, buffer, len, -1);
             }
         }
