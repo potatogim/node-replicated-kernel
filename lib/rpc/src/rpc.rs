@@ -100,11 +100,12 @@ unsafe_abomonate!(RPCType);
 #[derive(Debug)]
 pub struct RPCHeader {
     pub client_id: u64,
+    pub pid: u64,
     pub req_id: u64,
     pub msg_type: RPCType,
     pub msg_len: u64,
 }
-unsafe_abomonate!(RPCHeader: client_id, req_id, msg_type, msg_len);
+unsafe_abomonate!(RPCHeader: client_id, pid, req_id, msg_type, msg_len);
 
 //////// FILEIO Operations
 #[derive(Debug)]

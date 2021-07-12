@@ -380,11 +380,12 @@ fn handle_fileio(
             {
                 let filename = userptr_to_str(pathname)?;
                 let mut client = kcb.arch.rpc_client.lock();
-                return match client
-                    .as_mut()
-                    .unwrap()
-                    .fio_open(filename.as_bytes(), flags, modes)
-                {
+                return match client.as_mut().unwrap().fio_open(
+                    pid as u64,
+                    filename.as_bytes(),
+                    flags,
+                    modes,
+                ) {
                     Ok(a) => Ok(a),
                     Err(err) => Err(err.into()),
                 };
@@ -419,7 +420,7 @@ fn handle_fileio(
             #[cfg(feature = "exokernel")]
             {
                 let mut client = kcb.arch.rpc_client.lock();
-                return match client.as_mut().unwrap().fio_close(fd) {
+                return match client.as_mut().unwrap().fio_close(pid as u64, fd) {
                     Ok(a) => Ok(a),
                     Err(err) => Err(err.into()),
                 };

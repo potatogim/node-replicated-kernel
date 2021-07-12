@@ -22,7 +22,7 @@ pub trait RPCServerAPI {
 /// RPC client operations
 pub trait RPCClientAPI {
     /// calls a remote RPC function with ID
-    fn rpc_call(&mut self, rpc_id: RPCType, data: Vec<u8>) -> Result<Vec<u8>, RPCError>;
+    fn rpc_call(&mut self, pid: u64, rpc_id: RPCType, data: Vec<u8>) -> Result<Vec<u8>, RPCError>;
 
     /// send data to a remote node
     fn msg_send(&mut self, data: Vec<u8>) -> Result<(), RPCError>;

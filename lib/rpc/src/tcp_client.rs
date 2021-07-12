@@ -84,7 +84,7 @@ impl ClusterClientAPI for TCPClient<'_> {
             }
         }
 
-        self.rpc_call(RPCType::Registration, Vec::new()).unwrap();
+        self.rpc_call(0, RPCType::Registration, Vec::new()).unwrap();
         Ok(self.client_id)
     }
 }
@@ -92,10 +92,11 @@ impl ClusterClientAPI for TCPClient<'_> {
 /// RPC client operations
 impl RPCClientAPI for TCPClient<'_> {
     /// calls a remote RPC function with ID
-    fn rpc_call(&mut self, rpc_id: RPCType, data: Vec<u8>) -> Result<Vec<u8>, RPCError> {
+    fn rpc_call(&mut self, pid: u64, rpc_id: RPCType, data: Vec<u8>) -> Result<Vec<u8>, RPCError> {
         // Create request header
         let req_hdr = RPCHeader {
             client_id: self.client_id,
+            pid: pid,
             req_id: self.req_id,
             msg_type: rpc_id,
             msg_len: data.len() as u64,
@@ -197,12 +198,13 @@ impl RPCClientAPI for TCPClient<'_> {
 }
 
 impl TCPClient<'_> {
-    pub fn fio_write(&mut self, fd: u64, data: Vec<u8>) -> Result<(u64, u64), RPCError> {
-        self.fio_writeat(fd, 0, data)
+    pub fn fio_write(&mut self, pid: u64, fd: u64, data: Vec<u8>) -> Result<(u64, u64), RPCError> {
+        self.fio_writeat(pid, fd, 0, data)
     }
 
     pub fn fio_writeat(
         &mut self,
+        pid: u64,
         fd: u64,
         offset: u64,
         data: Vec<u8>,
@@ -215,7 +217,7 @@ impl TCPClient<'_> {
         unsafe { encode(&req, &mut req_data) }.unwrap();
         req_data.extend(data);
 
-        let mut res = self.rpc_call(RPCType::WriteAt, req_data).unwrap();
+        let mut res = self.rpc_call(pid, RPCType::WriteAt, req_data).unwrap();
         if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
                 return Err(RPCError::ExtraData);
@@ -227,11 +229,17 @@ impl TCPClient<'_> {
         }
     }
 
-    pub fn fio_read(&mut self, fd: u64, len: u64) -> Result<(u64, u64), RPCError> {
-        self.fio_readat(fd, len, 0)
+    pub fn fio_read(&mut self, pid: u64, fd: u64, len: u64) -> Result<(u64, u64), RPCError> {
+        self.fio_readat(pid, fd, len, 0)
     }
 
-    pub fn fio_readat(&mut self, fd: u64, len: u64, offset: u64) -> Result<(u64, u64), RPCError> {
+    pub fn fio_readat(
+        &mut self,
+        pid: u64,
+        fd: u64,
+        len: u64,
+        offset: u64,
+    ) -> Result<(u64, u64), RPCError> {
         let req = RPCReadReq {
             fd: fd,
             len: len,
@@ -240,7 +248,7 @@ impl TCPClient<'_> {
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
 
-        let mut res = self.rpc_call(RPCType::ReadAt, req_data).unwrap();
+        let mut res = self.rpc_call(pid, RPCType::ReadAt, req_data).unwrap();
         if let Some((res, _remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             // TODO: add back in check
             //if res.num_bytes != remaining.len() as u64 {
@@ -256,24 +264,27 @@ impl TCPClient<'_> {
 
     pub fn fio_create(
         &mut self,
+        pid: u64,
         pathname: &[u8],
         flags: u64,
         modes: u64,
     ) -> Result<(u64, u64), RPCError> {
-        self.fio_open_create(pathname, flags, modes, RPCType::Create)
+        self.fio_open_create(pid, pathname, flags, modes, RPCType::Create)
     }
 
     pub fn fio_open(
         &mut self,
+        pid: u64,
         pathname: &[u8],
         flags: u64,
         modes: u64,
     ) -> Result<(u64, u64), RPCError> {
-        self.fio_open_create(pathname, flags, modes, RPCType::Open)
+        self.fio_open_create(pid, pathname, flags, modes, RPCType::Open)
     }
 
     fn fio_open_create(
         &mut self,
+        pid: u64,
         pathname: &[u8],
         flags: u64,
         modes: u64,
@@ -286,7 +297,7 @@ impl TCPClient<'_> {
         };
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
-        let mut res = self.rpc_call(rpc_type, req_data).unwrap();
+        let mut res = self.rpc_call(pid, rpc_type, req_data).unwrap();
         if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
                 return Err(RPCError::ExtraData);
@@ -298,12 +309,12 @@ impl TCPClient<'_> {
         }
     }
 
-    pub fn fio_close(&mut self, fd: u64) -> Result<(u64, u64), RPCError> {
+    pub fn fio_close(&mut self, pid: u64, fd: u64) -> Result<(u64, u64), RPCError> {
         let req = RPCCloseReq { fd: fd };
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
 
-        let mut res = self.rpc_call(RPCType::Close, req_data).unwrap();
+        let mut res = self.rpc_call(pid, RPCType::Close, req_data).unwrap();
         if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
                 return Err(RPCError::ExtraData);
@@ -315,13 +326,13 @@ impl TCPClient<'_> {
         }
     }
 
-    pub fn fio_delete(&mut self, pathname: &[u8]) -> Result<(u64, u64), RPCError> {
+    pub fn fio_delete(&mut self, pid: u64, pathname: &[u8]) -> Result<(u64, u64), RPCError> {
         let req = RPCDeleteReq {
             pathname: pathname.to_vec(),
         };
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
-        let mut res = self.rpc_call(RPCType::Delete, req_data).unwrap();
+        let mut res = self.rpc_call(pid, RPCType::Delete, req_data).unwrap();
         if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
                 return Err(RPCError::ExtraData);
@@ -333,14 +344,19 @@ impl TCPClient<'_> {
         }
     }
 
-    pub fn fio_rename(&mut self, oldname: &[u8], newname: &[u8]) -> Result<(u64, u64), RPCError> {
+    pub fn fio_rename(
+        &mut self,
+        pid: u64,
+        oldname: &[u8],
+        newname: &[u8],
+    ) -> Result<(u64, u64), RPCError> {
         let req = RPCRenameReq {
             oldname: oldname.to_vec(),
             newname: newname.to_vec(),
         };
         let mut req_data = Vec::new();
         unsafe { encode(&req, &mut req_data) }.unwrap();
-        let mut res = self.rpc_call(RPCType::FileRename, req_data).unwrap();
+        let mut res = self.rpc_call(pid, RPCType::FileRename, req_data).unwrap();
         if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
             if remaining.len() > 0 {
                 return Err(RPCError::ExtraData);
