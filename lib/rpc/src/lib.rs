@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate abomonation;
 extern crate alloc;
+extern crate kpi;
 extern crate lazy_static;
 extern crate smoltcp;
 

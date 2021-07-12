@@ -782,6 +782,7 @@ dependencies = [
 name = "kpi"
 version = "0.1.0"
 dependencies = [
+ "abomonation",
  "bitflags",
  "env_logger 0.8.3",
  "log",
@@ -1421,6 +1422,7 @@ name = "rpc"
 version = "0.1.0"
 dependencies = [
  "abomonation",
+ "kpi",
  "lazy_static",
  "log",
  "smoltcp",

@@ -8,6 +8,7 @@ use smoltcp::socket::{SocketHandle, SocketSet, TcpSocket, TcpSocketBuffer};
 use smoltcp::time::Instant;
 use smoltcp::wire::IpAddress;
 
+use kpi::io::FileInfo;
 use vmxnet3::smoltcp::DevQueuePhy;
 
 use crate::cluster_api::{ClusterClientAPI, ClusterError, NodeId};
@@ -206,7 +207,7 @@ impl TCPClient<'_> {
         &mut self,
         pid: u64,
         fd: u64,
-        offset: u64,
+        offset: i64,
         data: Vec<u8>,
     ) -> Result<(u64, u64), RPCError> {
         let req = RPCWriteReq {
@@ -244,7 +245,7 @@ impl TCPClient<'_> {
         pid: u64,
         fd: u64,
         len: u64,
-        offset: u64,
+        offset: i64,
         buff_ptr: &mut [u8],
     ) -> Result<(u64, u64), RPCError> {
         let req = RPCReadReq {
@@ -383,6 +384,52 @@ impl TCPClient<'_> {
             }
             debug!("Rename() {:?}", res);
             return res.ret;
+        } else {
+            return Err(RPCError::MalformedResponse);
+        }
+    }
+
+    pub fn fio_mkdir(
+        &mut self,
+        pid: u64,
+        pathname: &[u8],
+        modes: u64,
+    ) -> Result<(u64, u64), RPCError> {
+        let req = RPCMkDirReq {
+            pathname: pathname.to_vec(),
+            modes: modes,
+        };
+        let mut req_data = Vec::new();
+        unsafe { encode(&req, &mut req_data) }.unwrap();
+        let mut res = self.rpc_call(pid, RPCType::MkDir, req_data).unwrap();
+        if let Some((res, remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
+            if remaining.len() > 0 {
+                return Err(RPCError::ExtraData);
+            }
+            debug!("MkDir() {:?}", res);
+            return res.ret;
+        } else {
+            return Err(RPCError::MalformedResponse);
+        }
+    }
+
+    pub fn fio_getinfo(&mut self, pid: u64, name: &[u8]) -> Result<(u64, u64), RPCError> {
+        let req = RPCGetInfoReq {
+            name: name.to_vec(),
+        };
+        let mut req_data = Vec::new();
+        unsafe { encode(&req, &mut req_data) }.unwrap();
+        let mut res = self.rpc_call(pid, RPCType::GetInfo, req_data).unwrap();
+        if let Some((res, mut data)) = unsafe { decode::<FIORPCRes>(&mut res) } {
+            if let Some((file_info, remaining)) = unsafe { decode::<FileInfo>(&mut data) } {
+                if remaining.len() != 0 {
+                    return Err(RPCError::ExtraData);
+                }
+                debug!("FileInfo() {:?}", file_info);
+                return Ok((file_info.ftype, file_info.fsize));
+            } else {
+                return Err(RPCError::MalformedResponse);
+            }
         } else {
             return Err(RPCError::MalformedResponse);
         }

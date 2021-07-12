@@ -114,7 +114,7 @@ pub struct RPCOpenReq {
     pub flags: u64,
     pub modes: u64,
 }
-unsafe_abomonate!(RPCOpenReq: pathname);
+unsafe_abomonate!(RPCOpenReq: pathname, flags, modes);
 
 #[derive(Debug)]
 pub struct RPCCloseReq {
@@ -139,16 +139,29 @@ unsafe_abomonate!(RPCRenameReq: oldname, newname);
 pub struct RPCReadReq {
     pub fd: u64,
     pub len: u64,
-    pub offset: u64,
+    pub offset: i64,
 }
 unsafe_abomonate!(RPCReadReq: fd, len, offset);
 
 #[derive(Debug)]
 pub struct RPCWriteReq {
     pub fd: u64,
-    pub offset: u64,
+    pub offset: i64,
 }
 unsafe_abomonate!(RPCWriteReq: fd, offset);
+
+#[derive(Debug)]
+pub struct RPCMkDirReq {
+    pub pathname: Vec<u8>,
+    pub modes: u64,
+}
+unsafe_abomonate!(RPCMkDirReq: pathname, modes);
+
+#[derive(Debug)]
+pub struct RPCGetInfoReq {
+    pub name: Vec<u8>,
+}
+unsafe_abomonate!(RPCGetInfoReq: name);
 
 #[derive(Debug)]
 pub struct FIORPCRes {
