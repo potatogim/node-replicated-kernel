@@ -229,8 +229,14 @@ impl TCPClient<'_> {
         }
     }
 
-    pub fn fio_read(&mut self, pid: u64, fd: u64, len: u64) -> Result<(u64, u64), RPCError> {
-        self.fio_readat(pid, fd, len, 0)
+    pub fn fio_read(
+        &mut self,
+        pid: u64,
+        fd: u64,
+        len: u64,
+        buff_ptr: &mut [u8],
+    ) -> Result<(u64, u64), RPCError> {
+        self.fio_readat(pid, fd, len, 0, buff_ptr)
     }
 
     pub fn fio_readat(
@@ -239,6 +245,7 @@ impl TCPClient<'_> {
         fd: u64,
         len: u64,
         offset: u64,
+        buff_ptr: &mut [u8],
     ) -> Result<(u64, u64), RPCError> {
         let req = RPCReadReq {
             fd: fd,
@@ -249,13 +256,29 @@ impl TCPClient<'_> {
         unsafe { encode(&req, &mut req_data) }.unwrap();
 
         let mut res = self.rpc_call(pid, RPCType::ReadAt, req_data).unwrap();
-        if let Some((res, _remaining)) = unsafe { decode::<FIORPCRes>(&mut res) } {
-            // TODO: add back in check
-            //if res.num_bytes != remaining.len() as u64 {
-            //    warn!("Unexpected amount of data: bytes_read={:?}, data.len={:?}", res.num_bytes, remaining.len());
-            //    return Err(KError::NotSupported);
-            //}
-            debug!("Read() {:?}", res);
+        if let Some((res, data)) = unsafe { decode::<FIORPCRes>(&mut res) } {
+            // If result is good, check how much data was returned
+            if let Ok((bytes_read, _)) = res.ret {
+                if bytes_read != data.len() as u64 {
+                    warn!(
+                        "Unexpected amount of data: bytes_read={:?}, data.len={:?}",
+                        bytes_read,
+                        data.len()
+                    );
+                    return Err(RPCError::MalformedResponse);
+
+                // write data into user supplied buffer
+                // TODO: more efficient way to write data?
+                } else if bytes_read > 0 {
+                    let mut i = 0;
+                    for elem in buff_ptr.iter_mut() {
+                        *elem = data[i];
+                        i += 1;
+                    }
+                }
+                debug!("Read() {:?}", res);
+            }
+
             return res.ret;
         } else {
             return Err(RPCError::MalformedResponse);
